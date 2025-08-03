@@ -62,7 +62,7 @@ for col in label_enc_cols:
 # One-hot encode multi-category features
 df_encoded = pd.get_dummies(df, columns=['ChestPainType', 'RestingECG', 'ST_Slope'], drop_first=False)
 
-# === REMOVE OUTLIERS ===
+# === REMOVE OUTLIERS ON ENCODED DATA (excluding target) ===
 def remove_outliers_iqr(dataframe, cols):
     for col in cols:
         Q1 = dataframe[col].quantile(0.25)
@@ -73,9 +73,9 @@ def remove_outliers_iqr(dataframe, cols):
         dataframe = dataframe[(dataframe[col] >= lower_bound) & (dataframe[col] <= upper_bound)]
     return dataframe
 
-# Apply to all numeric columns
 numeric_cols = df_encoded.select_dtypes(include=[np.number]).columns.tolist()
-numeric_cols.remove('HeartDisease')  # Do not remove target labels
+if 'HeartDisease' in numeric_cols:
+    numeric_cols.remove('HeartDisease')  # Do not remove target labels
 df_encoded = remove_outliers_iqr(df_encoded, numeric_cols)
 
 # Separate features and target
@@ -158,5 +158,7 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# Save final cleaned version with no outliers
-df_encoded.to_csv('heart_failure_processed.csv', index=False)
+# Save final cleaned and encoded dataset (choose a file name that's not open)
+final_output_path = r"C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart_failure_processed.csv"
+df_encoded.to_csv(final_output_path, index=False)
+print("Final cleaned and encoded data saved.")
