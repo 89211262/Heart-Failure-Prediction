@@ -11,7 +11,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve
 
 # Load data
-df = pd.read_csv(r'C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart.csv')
+df = pd.read_csv(r'C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart.csv', sep=';')
 print("First 5 rows:\n", df.head())
 
 # Data info
@@ -23,6 +23,31 @@ print("\nMissing Values:\n", df.isnull().sum())
 
 # Drop duplicates
 df = df.drop_duplicates()
+
+# Display basic info before cleaning
+print("Original shape:", df.shape)
+
+# Function to remove outliers using IQR
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+# Remove outliers from all numerical columns
+numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+
+for col in numerical_cols:
+    original_len = len(df)
+    df = remove_outliers_iqr(df, col)
+    print(f"Removed outliers from {col}, new shape: {df.shape} (removed {original_len - len(df)} rows)")
+
+# Save cleaned dataset to the specified directory
+output_path = r"C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart_cleaned.csv"
+df.to_csv(output_path, index=False)
+print(f"Cleaned data saved to: {output_path}")
 
 # Check categorical unique values
 for col in ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']:
@@ -36,6 +61,22 @@ for col in label_enc_cols:
 
 # One-hot encode multi-category features
 df_encoded = pd.get_dummies(df, columns=['ChestPainType', 'RestingECG', 'ST_Slope'], drop_first=False)
+
+# === REMOVE OUTLIERS ===
+def remove_outliers_iqr(dataframe, cols):
+    for col in cols:
+        Q1 = dataframe[col].quantile(0.25)
+        Q3 = dataframe[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        dataframe = dataframe[(dataframe[col] >= lower_bound) & (dataframe[col] <= upper_bound)]
+    return dataframe
+
+# Apply to all numeric columns
+numeric_cols = df_encoded.select_dtypes(include=[np.number]).columns.tolist()
+numeric_cols.remove('HeartDisease')  # Do not remove target labels
+df_encoded = remove_outliers_iqr(df_encoded, numeric_cols)
 
 # Separate features and target
 X = df_encoded.drop('HeartDisease', axis=1)
@@ -116,3 +157,6 @@ plt.title("ROC Curve Comparison")
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+# Save final cleaned version with no outliers
+df_encoded.to_csv('heart_failure_processed.csv', index=False)
