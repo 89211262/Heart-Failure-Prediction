@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
@@ -10,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve
 
-# Load data
+# data
 df = pd.read_csv(r'C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart.csv', sep=';')
 print("First 5 rows:\n", df.head())
 
@@ -36,18 +37,17 @@ def remove_outliers_iqr(df, column):
     upper_bound = Q3 + 1.5 * IQR
     return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-# Remove outliers from all numerical columns
-numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+# Remove outliers
+numerical_cols = [col for col in df.select_dtypes(include=['int64', 'float64']).columns
+                  if df[col].nunique() > 2]
 
 for col in numerical_cols:
     original_len = len(df)
     df = remove_outliers_iqr(df, col)
     print(f"Removed outliers from {col}, new shape: {df.shape} (removed {original_len - len(df)} rows)")
 
-# Save cleaned dataset to the specified directory
-output_path = r"C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart_cleaned.csv"
+output_path = r"C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart_failure_processed.csv"
 df.to_csv(output_path, index=False)
-print(f"Cleaned data saved to: {output_path}")
 
 # Check categorical unique values
 for col in ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']:
@@ -62,7 +62,7 @@ for col in label_enc_cols:
 # One-hot encode multi-category features
 df_encoded = pd.get_dummies(df, columns=['ChestPainType', 'RestingECG', 'ST_Slope'], drop_first=False)
 
-# === REMOVE OUTLIERS ON ENCODED DATA (excluding target) ===
+# === REMOVE OUTLIERS ON ENCODED DATA (excluding target and binaries) ===
 def remove_outliers_iqr(dataframe, cols):
     for col in cols:
         Q1 = dataframe[col].quantile(0.25)
@@ -73,17 +73,23 @@ def remove_outliers_iqr(dataframe, cols):
         dataframe = dataframe[(dataframe[col] >= lower_bound) & (dataframe[col] <= upper_bound)]
     return dataframe
 
-numeric_cols = df_encoded.select_dtypes(include=[np.number]).columns.tolist()
-if 'HeartDisease' in numeric_cols:
-    numeric_cols.remove('HeartDisease')  # Do not remove target labels
+# Only select numeric columns with >2 unique values (i.e., not binaries or target)
+numeric_cols = [
+    col for col in df_encoded.select_dtypes(include=[np.number]).columns
+    if df_encoded[col].nunique() > 2 and col != 'HeartDisease'
+]
 df_encoded = remove_outliers_iqr(df_encoded, numeric_cols)
+
 
 # Separate features and target
 X = df_encoded.drop('HeartDisease', axis=1)
 y = df_encoded['HeartDisease']
 
 # Split dataset
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
 
 # Scale features
 scaler = StandardScaler()
@@ -158,7 +164,11 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# Save final cleaned and encoded dataset (choose a file name that's not open)
+# Save final cleaned and encoded dataset
 final_output_path = r"C:\Users\jorda\OneDrive\Desktop\heart failure prediction\Heart-Failure-Prediction\data\heart_failure_processed.csv"
 df_encoded.to_csv(final_output_path, index=False)
-print("Final cleaned and encoded data saved.")
+
+joblib.dump(logreg, 'logistic_model.pkl')
+joblib.dump(rf, 'random_forest_model.pkl')
+joblib.dump(ann_model, 'ann_model.pkl')
+joblib.dump(scaler, 'scaler.pkl')
